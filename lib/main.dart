@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'pages/connexion.dart';
+import 'package:shopping/pages/connexion.dart';
+import 'package:shopping/pages/inscription.dart';
 import 'pages/splashPage.dart';
 
 void main() {
@@ -12,6 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+
       debugShowCheckedModeBanner: false,
       home: const SplashPage(),           // première page affichée
       routes: {
