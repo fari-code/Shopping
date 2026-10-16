@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:shopping/pages/connexion.dart';
-import 'package:shopping/pages/inscription.dart';
-import 'pages/splashPage.dart';
+import 'package:shopping/screens/inscription.dart';
+import 'package:shopping/screens/search.dart';
+// import 'package:shopping/screens/connexion.dart';
+// import 'package:shopping/screens/inscription.dart';
+import 'package:shopping/screens/shopping.dart';
+import 'package:shopping/screens/splashPage.dart';
+
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +21,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const SplashPage(),           // première page affichée
       routes: {
-        '/home': (context) => const Connexion(),
+        '/home': (context) => ShoppingPage(repository: MockShoppingRepository(),
+          icons: ShoppingIcons.defaults(),
+          currency: "€",),
+        // '/home': (context) => Inscription(),
       },
     );
   }
