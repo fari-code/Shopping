@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'product_detail.dart';
+import 'cart_screen.dart';
 
 const _ink = Color(0xFF1C1A17);
 const _muted = Color(0xFF8A5A00);
 const _amberDark = Color(0xFFF59A00);
 const _barColor = Color(0xFF1B1B1B);
+
+// Texts taken from the mockup (easy to change in one place).
+const _kSearchHint = 'Search games';
 
 class ShoppingCategory {
   final String id;
@@ -31,12 +36,36 @@ class ShoppingProduct {
   final String? imageUrl;
   final String? categoryId;
 
+  /// Couleurs disponibles (vide = non applicable, ex. un laptop).
+  final List<String> colours;
+
+  /// Tailles disponibles (vide = non applicable).
+  final List<String> sizes;
+
+  /// Note moyenne sur 5 (0 = pas encore noté, les étoiles sont masquées).
+  final double rating;
+
+  /// Nombre d'avis clients (0 = aucun, le texte "Reviews" est masqué).
+  final int reviewCount;
+
+  /// Description du produit (null/vide = section masquée).
+  final String? description;
+
+  /// Nom de la boutique qui vend le produit (null = masqué).
+  final String? storeName;
+
   const ShoppingProduct({
     required this.id,
     required this.name,
     required this.price,
     this.imageUrl,
     this.categoryId,
+    this.colours = const [],
+    this.sizes = const [],
+    this.rating = 0,
+    this.reviewCount = 0,
+    this.description,
+    this.storeName,
   });
 
   factory ShoppingProduct.fromJson(Map<String, dynamic> json) =>
@@ -46,10 +75,30 @@ class ShoppingProduct {
         price: (json['price'] as num?)?.toDouble() ?? 0,
         imageUrl: json['image']?.toString(),
         categoryId: json['category_id']?.toString(),
+        colours:
+        (json['colours'] as List?)?.map((e) => '$e').toList() ?? const [],
+        sizes: (json['sizes'] as List?)?.map((e) => '$e').toList() ?? const [],
+        rating: (json['rating'] as num?)?.toDouble() ?? 0,
+        reviewCount: (json['review_count'] as num?)?.toInt() ?? 0,
+        description: json['description']?.toString(),
+        storeName: json['store_name']?.toString(),
       );
+
+  /// Copie du produit avec un autre prix (utile pour les promotions).
+  ShoppingProduct copyWith({double? price}) => ShoppingProduct(
+    id: id,
+    name: name,
+    price: price ?? this.price,
+    imageUrl: imageUrl,
+    categoryId: categoryId,
+    colours: colours,
+    sizes: sizes,
+    rating: rating,
+    reviewCount: reviewCount,
+    description: description,
+    storeName: storeName,
+  );
 }
-
-
 
 abstract class ShoppingRepository {
   Future<List<ShoppingCategory>> fetchCategories();
@@ -57,9 +106,9 @@ abstract class ShoppingRepository {
   Future<List<ShoppingProduct>> fetchBestSells();
 }
 
-/// Données fictives locales : aucune API ni connexion Internet nécessaire.
-/// Remplacez ce repository par une implémentation API lorsque votre backend
-/// sera prêt.
+/// Local mock data: no API or Internet connection needed.
+/// Replace this repository with an API implementation once your backend
+/// is ready.
 class MockShoppingRepository implements ShoppingRepository {
   static const _categories = <ShoppingCategory>[
     ShoppingCategory(
@@ -92,6 +141,24 @@ class MockShoppingRepository implements ShoppingRepository {
       imageUrl:
       'https://images.unsplash.com/photo-1503602642458-232111445657?w=300',
     ),
+    ShoppingCategory(
+      id: 'sports',
+      name: 'Sports',
+      imageUrl:
+      'https://images.unsplash.com/photo-1517649763962-0c6232660102?w=300',
+    ),
+    ShoppingCategory(
+      id: 'beauty',
+      name: 'Beauty',
+      imageUrl:
+      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=300',
+    ),
+    ShoppingCategory(
+      id: 'gaming',
+      name: 'Gaming',
+      imageUrl:
+      'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=300',
+    ),
   ];
 
   static const _featured = <ShoppingProduct>[
@@ -100,6 +167,12 @@ class MockShoppingRepository implements ShoppingRepository {
       name: 'Branded Shoes',
       price: 25,
       categoryId: 'shoes',
+      colours: ['Black', 'White'],
+      sizes: ['40', '41', '42', '43'],
+      rating: 4,
+      reviewCount: 320,
+      storeName: 'Sneaker House',
+      description: 'Comfortable branded shoes for everyday wear, with a light sole and breathable upper.',
       imageUrl:
       'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500',
     ),
@@ -108,6 +181,13 @@ class MockShoppingRepository implements ShoppingRepository {
       name: 'Branded T-Shirt',
       price: 20,
       categoryId: 'apparel',
+      colours: ['Black', 'White', 'Cyan', 'Magenta', 'Green'],
+      sizes: ['S', 'M', 'L', 'XL'],
+      rating: 5,
+      reviewCount: 1000,
+      storeName: 'Garments Store',
+      description:
+      'Phasellus ipsum sed arcu nisl. Mattis lobortis in donec malesuada et mollis pellentesque volutpat. Ut bibendum sollicitudin pulvinar quis quis ultricies. Fringilla sit nibh phasellus enim aliquet cursus gravida ultrices scelerisque. Vitae quis dictumst eget non quam vulputate. Felis egestas vitae lectus ut pellentesque.',
       imageUrl:
       'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500',
     ),
@@ -139,15 +219,75 @@ class MockShoppingRepository implements ShoppingRepository {
       id: 'p6',
       name: 'Talon',
       price: 20,
-      categoryId: 'Shoes',
+      categoryId: 'shoes',
       imageUrl:
       'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D',
+    ),
+    ShoppingProduct(
+      id: 'p9',
+      name: 'Nike Air Max',
+      price: 110,
+      categoryId: 'shoes',
+      colours: ['White', 'Black'],
+      sizes: ['40', '41', '42', '43', '44'],
+      rating: 5,
+      reviewCount: 850,
+      storeName: 'Sneaker House',
+      description: 'Iconic Air Max cushioning with a bold design, made for all-day comfort.',
+      imageUrl:
+      'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p10',
+      name: 'Leather Jacket',
+      price: 150,
+      categoryId: 'apparel',
+      colours: ['Black', 'Brown'],
+      sizes: ['M', 'L', 'XL'],
+      rating: 4,
+      reviewCount: 210,
+      storeName: 'Garments Store',
+      description: 'Classic leather jacket with a soft lining and a timeless fit.',
+      imageUrl:
+      'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p11',
+      name: 'iPhone 15 Pro',
+      price: 999,
+      categoryId: 'phones',
+      imageUrl:
+      'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p12',
+      name: 'Sony Headphones',
+      price: 299,
+      categoryId: 'tech',
+      imageUrl:
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p13',
+      name: 'Desk Lamp',
+      price: 45,
+      categoryId: 'home',
+      imageUrl:
+      'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p14',
+      name: 'Gaming Keyboard',
+      price: 89,
+      categoryId: 'gaming',
+      imageUrl:
+      'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=500',
     ),
   ];
 
   static const _bestSells = <ShoppingProduct>[
     ShoppingProduct(
-      id: 'p5',
+      id: 'p15',
       name: 'Dell New Laptop',
       price: 2500,
       categoryId: 'tech',
@@ -155,7 +295,7 @@ class MockShoppingRepository implements ShoppingRepository {
       'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500',
     ),
     ShoppingProduct(
-      id: 'p6',
+      id: 'p16',
       name: 'Sitting Chair',
       price: 75,
       categoryId: 'home',
@@ -163,24 +303,56 @@ class MockShoppingRepository implements ShoppingRepository {
       'https://images.unsplash.com/photo-1503602642458-232111445657?w=500',
     ),
     ShoppingProduct(
-      id: 'p7',
+      id: 'p17',
       name: 'Hanging Mirror',
       price: 50,
-      categoryId: 'Shoes',
+      categoryId: 'home',
       imageUrl:
       'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=500',
     ),
     ShoppingProduct(
-      id: 'p8',
+      id: 'p18',
       name: 'Apple AirPods',
       price: 120,
       categoryId: 'phones',
       imageUrl:
       'https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=500',
     ),
+    ShoppingProduct(
+      id: 'p19',
+      name: 'Espresso Machine',
+      price: 350,
+      categoryId: 'home',
+      imageUrl:
+      'https://images.unsplash.com/photo-1517668808822-9402f2db04b3?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p20',
+      name: 'Smart Watch',
+      price: 199,
+      categoryId: 'tech',
+      imageUrl:
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p21',
+      name: 'Running Backpack',
+      price: 65,
+      categoryId: 'sports',
+      imageUrl:
+      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500',
+    ),
+    ShoppingProduct(
+      id: 'p22',
+      name: 'Bluetooth Speaker',
+      price: 80,
+      categoryId: 'tech',
+      imageUrl:
+      'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500',
+    ),
   ];
 
-  // Simule un petit délai réseau afin de tester l'état de chargement.
+  // Simulates a small network delay to test the loading state.
   Future<T> _fakeRequest<T>(T data) async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
     return data;
@@ -198,7 +370,7 @@ class MockShoppingRepository implements ShoppingRepository {
       _fakeRequest(_bestSells);
 }
 
-// ───────────────────────── Icônes ─────────────────────────
+// ───────────────────────── Icons ─────────────────────────
 
 class ShoppingIcons {
   final Widget? back, menu, cart, search, mic, camera;
@@ -221,8 +393,8 @@ class ShoppingIcons {
     this.fab,
   });
 
-  /// Icônes par défaut pour démarrer rapidement.
-  /// Vous pourrez les remplacer par vos propres icônes/SVG.
+  /// Default icons to get started quickly.
+  /// You can replace them with your own icons/SVGs.
   factory ShoppingIcons.defaults() => const ShoppingIcons(
     back: Icon(Icons.arrow_back, size: 26, color: _ink),
     menu: Icon(Icons.menu, size: 26, color: _ink),
@@ -242,7 +414,7 @@ class ShoppingIcons {
   );
 }
 
-// ───────────────────────── Page Shopping ─────────────────────────
+// ───────────────────────── Shopping page ─────────────────────────
 
 class ShoppingPage extends StatefulWidget {
   final ShoppingRepository repository;
@@ -278,12 +450,25 @@ class _ShoppingPageState extends State<ShoppingPage> {
   Object? _error;
   String _catId = 'all';
   String _query = '';
-  int _cartCount = 0;
+  /// Nombre d'articles du panier partagé (valeur du badge).
+  int get _cartCount => CartController.instance.itemCount;
 
   @override
   void initState() {
     super.initState();
+    // Met à jour le badge dès que le panier change.
+    CartController.instance.addListener(_onCartChanged);
     _load();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    CartController.instance.removeListener(_onCartChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -322,11 +507,16 @@ class _ShoppingPageState extends State<ShoppingPage> {
   }).toList();
 
   void _add(ShoppingProduct product) {
-    setState(() => _cartCount++);
+    // Ajoute au panier partagé avec la taille et la couleur par défaut.
+    CartController.instance.add(
+      product: product,
+      size: product.sizes.isNotEmpty ? product.sizes.first : null,
+      colour: product.colours.isNotEmpty ? product.colours.first : null,
+    );
     widget.onAddToCart?.call(product);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${product.name} ajouté au panier'),
+        content: Text('${product.name} added to cart'),
         duration: const Duration(milliseconds: 900),
         behavior: SnackBarBehavior.floating,
       ),
@@ -338,6 +528,19 @@ class _ShoppingPageState extends State<ShoppingPage> {
       _catId = 'all';
       _query = '';
     });
+  }
+
+  void _openCart() {
+    if (widget.onCartTap != null) {
+      widget.onCartTap!();
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CartScreen(currency: widget.currency),
+      ),
+    );
   }
 
   @override
@@ -364,10 +567,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
           children: [
             _iconSlot(icons.navHome),
             GestureDetector(
-              onTap: widget.onCartTap ??
-                      () => ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Articles dans le panier : $_cartCount')),
-                  ),
+              onTap: _openCart,
               child: _iconSlot(icons.navCart),
             ),
             const SizedBox(width: 56),
@@ -399,11 +599,11 @@ class _ShoppingPageState extends State<ShoppingPage> {
               children: [
                 _header(),
                 _searchRow(),
-                _section('Catégories'),
+                _section('Categories'),
                 _categoryList(),
-                _section('Produits vedettes'),
+                _section('Featured Products'),
                 _productList(_filter(_featured)),
-                _section('Meilleures ventes'),
+                _section('Best sells'),
                 _productList(_filter(_best)),
               ],
             ),
@@ -423,14 +623,14 @@ class _ShoppingPageState extends State<ShoppingPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Impossible de charger les produits.',
+            'Unable to load products.',
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _load,
             style: FilledButton.styleFrom(backgroundColor: _ink),
-            child: const Text('Réessayer'),
+            child: const Text('Retry'),
           ),
         ],
       ),
@@ -444,7 +644,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: widget.onBack,
+            onTap: widget.onBack ?? () => Navigator.maybePop(context),
             child: _iconSlot(icons.back),
           ),
           const SizedBox(width: 8),
@@ -455,10 +655,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
             ),
           ),
           GestureDetector(
-            onTap: widget.onCartTap ??
-                    () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Articles dans le panier : $_cartCount')),
-                ),
+            onTap: _openCart,
             child: SizedBox(
               width: 44,
               height: 44,
@@ -467,24 +664,26 @@ class _ShoppingPageState extends State<ShoppingPage> {
                 alignment: Alignment.center,
                 children: [
                   if (icons.cart != null) icons.cart!,
+                  // Small white badge, as on the mockup.
                   Positioned(
-                    top: 3,
-                    right: 0,
+                    top: 2,
+                    right: 2,
                     child: Container(
                       constraints:
-                      const BoxConstraints(minWidth: 16, minHeight: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      const BoxConstraints(minWidth: 13, minHeight: 13),
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
-                        color: _ink,
-                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(7),
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        '$_cartCount',
+                        _cartCount > 99 ? '99+' : '$_cartCount',
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
+                          color: _ink,
+                          fontSize: 7,
                           fontWeight: FontWeight.w600,
+                          height: 1,
                         ),
                       ),
                     ),
@@ -516,37 +715,41 @@ class _ShoppingPageState extends State<ShoppingPage> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  if (icons.search != null) ...[
-                    icons.search!,
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: TextField(
-                      onChanged: (value) => setState(() => _query = value.trim()),
-                      style: const TextStyle(fontSize: 12),
-                      decoration: const InputDecoration(
-                        hintText: 'Rechercher un produit',
-                        hintStyle: TextStyle(fontSize: 11),
-                        border: InputBorder.none,
-                        isDense: true,
+            child: GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/search'),
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    if (icons.search != null) ...[
+                      icons.search!,
+                      const SizedBox(width: 8),
+                    ],
+                    const Expanded(
+                      child: AbsorbPointer(
+                        child: TextField(
+                          style: TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            hintText: _kSearchHint,
+                            hintStyle: TextStyle(fontSize: 11),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  if (icons.mic != null) ...[
-                    icons.mic!,
-                    const SizedBox(width: 8),
+                    if (icons.mic != null) ...[
+                      icons.mic!,
+                      const SizedBox(width: 8),
+                    ],
+                    if (icons.camera != null) icons.camera!,
                   ],
-                  if (icons.camera != null) icons.camera!,
-                ],
+                ),
               ),
             ),
           ),
@@ -567,7 +770,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
           onTap: _showAll,
           child: const Padding(
             padding: EdgeInsets.symmetric(vertical: 4),
-            child: Text('Tout voir',
+            child: Text('See all',
                 style:
                 TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
           ),
@@ -578,7 +781,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
 
   Widget _categoryList() {
     final items = <ShoppingCategory>[
-      const ShoppingCategory(id: 'all', name: 'Tout'),
+      const ShoppingCategory(id: 'all', name: 'All'),
       ..._categories.where((c) => c.id != 'all'),
     ];
 
@@ -607,12 +810,16 @@ class _ShoppingPageState extends State<ShoppingPage> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF232323),
                       borderRadius: BorderRadius.circular(12),
-                      border: selected ? Border.all(color: _ink, width: 3) : null,
+                      border:
+                      selected ? Border.all(color: _ink, width: 3) : null,
                     ),
                     child: category.imageUrl != null &&
                         category.imageUrl!.isNotEmpty
                         ? _NetImage(category.imageUrl!, size: 80)
-                        : Image.asset('assets/mask.png'),
+                    // "All" tile: list icon like on the mockup
+                    // (no more dependency on assets/mask.png).
+                        : const Icon(Icons.format_list_bulleted_rounded,
+                        size: 44, color: _amberDark),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -640,7 +847,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Text(
-          'Aucun produit trouvé.',
+          'No products found.',
           style: TextStyle(fontSize: 13, color: _muted),
         ),
       );
@@ -659,7 +866,18 @@ class _ShoppingPageState extends State<ShoppingPage> {
           currency: widget.currency,
           addIcon: widget.icons.add,
           addedIcon: widget.icons.added,
-          onTap: widget.onProductTap,
+          onTap: widget.onProductTap ??
+                  (product) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProductDetailScreen(
+                      product: product,
+                      currency: widget.currency,
+                    ),
+                  ),
+                );
+              },
           onAdd: _add,
         ),
       ),
@@ -667,7 +885,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
   }
 }
 
-// ───────────────────────── Widgets internes ─────────────────────────
+// ───────────────────────── Internal widgets ─────────────────────────
 
 class _NetImage extends StatelessWidget {
   final String url;

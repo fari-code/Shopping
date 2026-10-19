@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shopping/screens/accueilPage.dart';
+import 'package:shopping/screens/shopping.dart';
 import 'package:shopping/screens/inscription.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../data/password_service.dart';
+import '../data/utilisateur_repository.dart';
+import '../models/utilisateur.dart';
 
 class Connexion extends StatefulWidget {
   const Connexion({super.key});
@@ -17,6 +22,159 @@ class _ConnexionState extends State<Connexion> {
   bool obscurePassword = true;
   bool isOn = false;
 
+  bool _isLoading = false;
+
+  void afficherSnackBar({required String message, required bool succes}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          padding: EdgeInsets.zero,
+          duration: const Duration(seconds: 3),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF222222),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: succes
+                    ? const Color(0xFF4CAF50)
+                    : const Color(0xFFE53935),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: succes
+                        ? const Color(0xFF4CAF50).withValues(alpha: 0.15)
+                        : const Color(0xFFE53935).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    succes ? Icons.check_circle_rounded : Icons.error_rounded,
+                    color: succes
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFFE53935),
+                    size: 23,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _connecter() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final emailSaisi = email.text.trim().toLowerCase();
+    final passwordSaisi = password.text;
+    bool success = false;
+
+    try {
+      // 1. Essayer la connexion via Firebase Auth
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: emailSaisi,
+          password: passwordSaisi,
+        );
+        success = true;
+      } catch (e) {
+        debugPrint('Firebase login note: $e');
+      }
+
+      // 2. Si Firebase échoue (ou hors-ligne), essayer SQLite
+      if (!success) {
+        try {
+          final SqliteUtilisateurRepository repository = SqliteUtilisateurRepository();
+          final Utilisateur? utilisateur = await repository.trouverParEmail(emailSaisi);
+
+          if (utilisateur != null) {
+            final motDePasseCorrect = await PasswordService.verifyPassword(
+              passwordSaisi,
+              utilisateur.passwordHash,
+            );
+            if (motDePasseCorrect) {
+              success = true;
+            }
+          }
+        } catch (e) {
+          debugPrint('SQLite login note: $e');
+        }
+      }
+
+      if (!mounted) return;
+
+      if (!success) {
+        afficherSnackBar(
+          message: 'E-mail ou mot de passe incorrect.',
+          succes: false,
+        );
+        return;
+      }
+
+      afficherSnackBar(
+        message: 'Connexion réussie ! Bienvenue.',
+        succes: true,
+      );
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ShoppingPage(
+            repository: MockShoppingRepository(),
+            icons: ShoppingIcons.defaults(),
+            currency: "€",
+          ),
+        ),
+      );
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+      debugPrint('ERREUR CONNEXION : $e');
+      debugPrint('DÉTAILS : $stackTrace');
+      afficherSnackBar(
+        message: 'Erreur : $e',
+        succes: false,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   void dispose() {
     password.dispose();
@@ -24,6 +182,7 @@ class _ConnexionState extends State<Connexion> {
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFFDA400),
@@ -40,20 +199,6 @@ class _ConnexionState extends State<Connexion> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Switch(
-                        inactiveTrackColor: const Color(0xFF222222),
-                        activeThumbColor: const Color(0xFFFDA400),
-                        value: isOn,
-                        onChanged: ((value) {
-                          setState(() {
-                            isOn = value;
-                          });
-                        }),
-                      ),
-                    ),
-
                     SizedBox(height: 42),
                     Text(
                       'Welcome!',
@@ -171,30 +316,23 @@ class _ConnexionState extends State<Connexion> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Connexion validée avec succès !',
+                        onPressed: _isLoading ? null : _connecter,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                'Login',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            );
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: ((context) => const AccueilPage()),
-                              ),
-                            );
-                          }
-                        },
-                        child: Text(
-                          'Login',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 10),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shopping/screens/accueilPage.dart';
 import 'package:shopping/screens/connexion.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sqflite/sqflite.dart';
-
 import '../data/password_service.dart';
 import '../data/utilisateur_repository.dart';
 import '../models/utilisateur.dart';
@@ -23,7 +23,6 @@ class _InscriptionState extends State<Inscription> {
   final TextEditingController email = TextEditingController();
   bool obscurePassword = true;
   bool isOn = false;
-  final SqliteUtilisateurRepository _repository = SqliteUtilisateurRepository();
 
   bool _isLoading = false;
 
@@ -94,82 +93,87 @@ class _InscriptionState extends State<Inscription> {
   }
 
   Future<void> _inscrire() async {
-    // 1. Vérifier les champs du formulaire.
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     final emailSaisi = email.text.trim().toLowerCase();
+    final passwordSaisi = password.text;
+    final nomSaisi = nom.text.trim();
+    final prenomSaisi = prenom.text.trim();
 
     try {
-      // 2. Vérifier si l'adresse e-mail existe déjà.
-      final existant = await _repository.trouverParEmail(emailSaisi);
-
-      if (existant != null) {
-        if (!mounted) return;
-
-        afficherSnackBar(
-          message: 'Cette adresse e-mail est déjà utilisée.',
-          succes: false,
+      // 1. Enregistrement dans Firebase Auth & Firestore
+      try {
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailSaisi,
+          password: passwordSaisi,
         );
-        return;
+
+        if (credential.user != null) {
+          await FirebaseFirestore.instance.collection('users').doc(credential.user!.uid).set({
+            'uid': credential.user!.uid,
+            'nom': nomSaisi,
+            'prenom': prenomSaisi,
+            'email': emailSaisi,
+            'created_at': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        debugPrint('Note: Firebase signup error or offline: $e');
       }
 
-      // 3. Hacher le mot de passe avant de l'enregistrer.
-      final hash = await PasswordService.hashPassword(password.text);
-
-      // 4. Créer l'utilisateur.
-      final utilisateur = Utilisateur(
-        nom: nom.text.trim(),
-        prenom: prenom.text.trim(),
-        email: emailSaisi,
-        passwordHash: hash,
-      );
-
-      // 5. Enregistrer l'utilisateur dans SQLite.
-      await _repository.ajouter(utilisateur);
+      // 2. Enregistrement simultané dans SQLite
+      try {
+        final SqliteUtilisateurRepository repository = SqliteUtilisateurRepository();
+        final existant = await repository.trouverParEmail(emailSaisi);
+        if (existant == null) {
+          final hash = await PasswordService.hashPassword(passwordSaisi);
+          final utilisateur = Utilisateur(
+            nom: nomSaisi,
+            prenom: prenomSaisi,
+            email: emailSaisi,
+            passwordHash: hash,
+          );
+          await repository.ajouter(utilisateur);
+        }
+      } catch (e) {
+        debugPrint('Note: SQLite signup error: $e');
+      }
 
       if (!mounted) return;
 
-      // 6. Afficher le message de succès.
       afficherSnackBar(
-        message: 'Inscription réussie ! Connectez-vous.',
+        message: 'Inscription réussie Connectez-vous !',
         succes: true,
       );
 
-      // 7. Laisser le temps de lire le message.
       await Future.delayed(const Duration(seconds: 2));
 
       if (!mounted) return;
 
-      // 8. Ouvrir la page de connexion.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const Connexion()),
       );
-    } on DatabaseException {
+    } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-
-      afficherSnackBar(
-        message:
-            'Impossible d’enregistrer le compte. '
-            'Vérifiez si cet e-mail est déjà utilisé.',
-        succes: false,
-      );
-    } catch (e,stackTrace) {
+      String message = 'Erreur Firebase.';
+      if (e.code == 'email-already-in-use') {
+        message = 'Cette adresse e-mail est déjà utilisée.';
+      } else if (e.code == 'weak-password') {
+        message = 'Le mot de passe est trop faible.';
+      } else if (e.code == 'invalid-email') {
+        message = 'Adresse e-mail invalide.';
+      } else {
+        message = e.message ?? message;
+      }
+      afficherSnackBar(message: message, succes: false);
+    } catch (e, stackTrace) {
       if (!mounted) return;
-
-      // afficherSnackBar(
-      //   message: 'Une erreur est survenue pendant l’inscription.',
-      //   succes: false,
-      // );
       debugPrint('ERREUR INSCRIPTION : $e');
       debugPrint('DÉTAILS : $stackTrace');
-
-      afficherSnackBar(
-        message: 'Erreur : $e',
-        succes: false,
-      );
+      afficherSnackBar(message: 'Erreur : $e', succes: false);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -207,19 +211,6 @@ class _InscriptionState extends State<Inscription> {
                   crossAxisAlignment: CrossAxisAlignment.start,
 
                   children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Switch(
-                        value: isOn,
-                        inactiveTrackColor: const Color(0xFF222222),
-                        activeThumbColor: const Color(0xFFFDA400),
-                        onChanged: (value) {
-                          setState(() {
-                            isOn = value;
-                          });
-                        },
-                      ),
-                    ),
                     SizedBox(height: 42),
                     Text(
                       'Hi!',

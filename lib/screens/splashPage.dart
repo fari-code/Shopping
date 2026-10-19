@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -12,8 +13,13 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 2), () {
-      if (mounted) Navigator.of(context).pushReplacementNamed('/home');
+    Timer(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/connexion');
     });
   }
 
