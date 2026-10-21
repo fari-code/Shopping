@@ -6,9 +6,12 @@ import 'package:shopping/screens/search.dart';
 import 'package:shopping/screens/shopping.dart';
 import 'package:shopping/screens/splashPage.dart';
 
+import 'data/notification_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await NotificationService.init();
   runApp(const MyApp());
 }
 

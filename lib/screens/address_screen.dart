@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'cart_controller.dart';
 import 'order_result_screen.dart';
 import 'payment_service.dart';
+import '../data/notification_service.dart';
 
 // ───────────────────────── Constantes de style ─────────────────────────
 
@@ -166,6 +167,19 @@ class _AddressScreenState extends State<AddressScreen> {
 
     if (result.success) {
       _cart.clear(); // commande passée : on vide le panier
+
+      // Déclencher la notification locale de confirmation de commande
+      try {
+        await NotificationService.showOrderNotification(
+          title: 'Commande confirmée !',
+          body: 'Votre commande a bien été enregistrée et sera livrée à ${address.line}.',
+        );
+      } catch (e) {
+        debugPrint('Erreur notification: $e');
+      }
+
+      if (!mounted) return;
+
       // On remplace toute la pile : le retour ne ramène pas au paiement.
       Navigator.pushAndRemoveUntil(
         context,
